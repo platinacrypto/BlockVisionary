@@ -1,0 +1,126 @@
+import requests
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+class BlockVisionary:
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+        self.base_url = 'https://api.etherscan.io/api'
+
+    def get_block_data(self, block_number: int) -> dict:
+        """Fetches block data for a given block number."""
+        url = self.base_url
+        params = {
+            'module': 'block',
+            'action': 'getblockreward',
+            'blockno': block_number,
+            'apikey': self.api_key
+        }
+        response = requests.get(url, params=params)
+        return response.json()
+
+    def get_transaction_data(self, block_number: int) -> dict:
+        """Fetches transaction list for a given block number."""
+        url = self.base_url
+        params = {
+            'module': 'account',
+            'action': 'txlist',
+            'address': '',  # Provide specific address if needed
+            'startblock': block_number,
+            'endblock': block_number,
+            'sort': 'asc',
+            'apikey': self.api_key
+        }
+        response = requests.get(url, params=params)
+        return response.json()
+
+    def get_contract_data(self, contract_address: str) -> dict:
+        """Fetches smart contract details for a given contract address."""
+        url = self.base_url
+        params = {
+            'module': 'contract',
+            'action': 'getabi',
+            'address': contract_address,
+            'apikey': self.api_key
+        }
+        response = requests.get(url, params=params)
+        return response.json()
+
+    def plot_block_rewards(self, start_block: int, end_block: int):
+        """Plots block rewards over a range of blocks."""
+        rewards = []
+        blocks = range(start_block, end_block + 1)
+
+        for block in blocks:
+            data = self.get_block_data(block)
+            if data['status'] == '1':
+                rewards.append({
+                    'block': block,
+                    'reward': float(data['result']['blockReward']) / 10**18  # Convert from wei to ETH
+                })
+
+        df = pd.DataFrame(rewards)
+        if df.empty:
+            print("No block reward data found.")
+            return
+
+        plt.figure(figsize=(12, 6))
+        sns.lineplot(x='block', y='reward', data=df, marker='o', color='b')
+        plt.title('Block Rewards Over Time')
+        plt.xlabel('Block Number')
+        plt.ylabel('Reward (ETH)')
+        plt.grid(True)
+        plt.show()
+
+    def plot_transaction_volume(self, start_block: int, end_block: int):
+        """Plots transaction volume over a range of blocks."""
+        volumes = []
+        blocks = range(start_block, end_block + 1)
+
+        for block in blocks:
+            tx_data = self.get_transaction_data(block)
+            if tx_data['status'] == '1':
+                volume = len(tx_data['result'])
+                volumes.append({
+                    'block': block,
+                    'volume': volume
+                })
+
+        df = pd.DataFrame(volumes)
+        if df.empty:
+            print("No transaction data found.")
+            return
+
+        plt.figure(figsize=(12, 6))
+        sns.lineplot(x='block', y='volume', data=df, marker='o', color='r')
+        plt.title('Transaction Volume Over Time')
+        plt.xlabel('Block Number')
+        plt.ylabel('Number of Transactions')
+        plt.grid(True)
+        plt.show()
+
+    def display_contract_abi(self, contract_address: str):
+        """Displays the ABI of a smart contract."""
+        contract_data = self.get_contract_data(contract_address)
+        if not contract_data or contract_data['result'] == 'Contract source code not verified':
+            print("No contract ABI found or contract not verified.")
+            return
+
+        print(f"ABI for Contract Address {contract_address}:")
+        print(contract_data['result'])
+
+# Example Usage
+if __name__ == "__main__":
+    api_key = 'YOUR_ETHERSCAN_API_KEY'  # Replace with your Etherscan API key
+    block_visionary = BlockVisionary(api_key)
+
+    # Plot Block Rewards
+    block_visionary.plot_block_rewards(start_block=15000000, end_block=15001000)
+
+    # Plot Transaction Volume
+    block_visionary.plot_transaction_volume(start_block=15000000, end_block=15001000)
+
+    # Display Contract ABI
+    contract_address = '0x5f3f3e25b0c1f69d8262f6a35ab45e0f8a6d7a8d'  # Example contract address
+    block_visionary.display_contract_abi(contract_address)
